@@ -1,0 +1,1289 @@
+
+/* ============================================
+   SCHOLARSHIP FINDER — COMPLETE APP.CSS
+   Dark charcoal + fresh green + white cards
+   ============================================ */
+
+/* ---------- Theme ---------- */
+
+:root {
+  font-family: "Manrope", Arial, sans-serif;
+
+  --page-bg: #17181f;
+  --panel-bg: #20232b;
+  --card-bg: #ffffff;
+
+  --green: #16834e;
+  --green-hover: #10663d;
+  --green-bright: #8be6b3;
+  --green-soft: #e1f7e8;
+
+  --heading: #153b2d;
+  --text: #365747;
+  --muted: #607568;
+  --text-light: #e9f2ec;
+  --text-muted-light: #c0cec5;
+
+  --border: #dcebe1;
+  --dark-border: #39423d;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--page-bg);
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+  background: var(--page-bg);
+  color: var(--text-light);
+}
+
+#root {
+  max-width: none;
+  border: 0;
+  text-align: left;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(22, 160, 91, 0.4);
+  outline-offset: 3px;
+}
+
+/* ---------- Header ---------- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid #e1ebe3;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: min(1480px, calc(100% - 64px));
+  min-height: 78px;
+  margin-inline: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #124b35;
+  text-align: left;
+}
+
+.brand-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.brand-text {
+  display: grid;
+  gap: 3px;
+}
+
+.brand-name {
+  color: #124b35;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.brand-tagline {
+  color: #596f62;
+  font-size: 11px;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
+}
+
+.nav-link {
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: #365747;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.nav-link:hover {
+  color: var(--green);
+}
+
+.nav-cta,
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: 1px solid var(--green);
+  border-radius: 10px;
+  background: var(--green);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.nav-cta:hover,
+.primary-button:hover {
+  border-color: var(--green-hover);
+  background: var(--green-hover);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* ---------- Hero ---------- */
+
+.hero-section {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-height: 560px;
+  padding: 64px max(32px, calc((100% - 1280px) / 2));
+  overflow: hidden;
+  background-color: #effbf2;
+  background-image: var(--hero-background);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 650px;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: #117545;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  line-height: 1.6;
+}
+
+.hero-content h1 {
+  max-width: 680px;
+  margin: 0 0 20px;
+  color: var(--heading);
+  font-size: clamp(38px, 4.5vw, 59px);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -2px;
+}
+
+.hero-content h1 span {
+  display: block;
+  color: #16a05b;
+}
+
+.hero-content > p:not(.hero-note) {
+  max-width: 530px;
+  margin: 0 0 26px;
+  color: #50675a;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.hero-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 590px;
+  padding: 7px 7px 7px 16px;
+  border: 1px solid #d7e9dc;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(18, 75, 53, 0.08);
+  color: #6d8576;
+}
+
+.hero-search input,
+.catalogue-search input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--heading);
+  font-size: 14px;
+}
+
+.hero-search input::placeholder,
+.catalogue-search input::placeholder {
+  color: #708276;
+  opacity: 1;
+}
+
+.hero-search button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 7px;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #16a05b;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hero-search button:hover {
+  background: var(--green-hover);
+}
+
+.hero-note {
+  margin: 15px 0 0;
+  color: #50675a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hero-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.hero-art img {
+  display: block;
+  width: min(100%, 460px);
+  max-height: 390px;
+  object-fit: contain;
+}
+
+/* ---------- Shared Containers ---------- */
+
+.section-container {
+  width: min(1480px, calc(100% - 64px));
+  margin-inline: auto;
+}
+
+/* ---------- Home Scholarships ---------- */
+
+.home-scholarships {
+  width: 100%;
+  padding: 72px 0 88px;
+  background: var(--page-bg);
+}
+
+/* Larger gutters so the cards do not touch the browser edges */
+.home-scholarships > .section-container {
+  width: min(1400px, calc(100% - 112px));
+  margin-inline: auto;
+}
+
+/* Center the eyebrow, heading and subtitle */
+.section-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 38px;
+  text-align: center;
+}
+
+.section-heading > div {
+  width: 100%;
+  text-align: center;
+}
+
+.section-heading .eyebrow {
+  margin-bottom: 12px;
+  color: #65d99a;
+}
+
+.section-heading h2 {
+  margin: 0 0 10px;
+  color: var(--green-bright);
+  font-size: clamp(27px, 3vw, 36px);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -1px;
+  text-align: center;
+}
+
+.section-heading p {
+  margin: 0;
+  color: var(--text-muted-light);
+  font-size: 14px;
+  line-height: 1.8;
+  text-align: center;
+}
+
+.section-heading .text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--green-bright);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.section-heading .text-button:hover {
+  color: #c0f5d5;
+}
+
+/* ---------- Scholarship Grid ---------- */
+
+.scholarship-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 26px;
+}
+
+/* ---------- Scholarship Cards ---------- */
+
+.scholarship-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 28px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card-bg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.scholarship-card:hover {
+  transform: translateY(-3px);
+  border-color: #a9dfba;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.17);
+}
+
+.scholarship-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.scholarship-provider {
+  min-width: 0;
+  color: #117545;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.scholarship-category {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: #12663e;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.scholarship-title {
+  margin: 0 0 14px;
+  color: var(--heading);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.45;
+  letter-spacing: -0.3px;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.scholarship-description {
+  display: -webkit-box;
+  min-height: 67px;
+  margin: 0 0 22px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: #50675a;
+  font-size: 13px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.scholarship-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 24px;
+  color: #50675a;
+  font-size: 12px;
+}
+
+.scholarship-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.scholarship-meta svg {
+  flex-shrink: 0;
+}
+
+.scholarship-card-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid #edf2ee;
+}
+
+.scholarship-amount {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.scholarship-amount > span {
+  color: #617568;
+  font-size: 11px;
+}
+
+.scholarship-amount strong {
+  color: #117545;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.card-details-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 5px;
+  padding: 9px 0 9px 5px;
+  border: 0;
+  background: transparent;
+  color: #117545;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card-details-button:hover {
+  color: #124b35;
+}
+
+/* ---------- Loading, Empty and Error States ---------- */
+
+.grid-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 250px;
+  padding: 35px 24px;
+  border: 1px dashed #b9ddc4;
+  border-radius: 18px;
+  background: #f3fbf5;
+  color: #117545;
+  text-align: center;
+}
+
+.grid-message h2,
+.grid-message h3 {
+  margin: 0;
+  color: var(--heading);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.grid-message p {
+  max-width: 520px;
+  margin: 0;
+  color: #50675a;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.grid-message .primary-button {
+  margin-top: 7px;
+}
+
+.loading-spinner {
+  animation: scholarship-spin 1s linear infinite;
+}
+
+@keyframes scholarship-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Browse Scholarships Page ---------- */
+
+.catalogue-page {
+  width: min(1480px, calc(100% - 96px));
+  min-height: 75vh;
+  margin-inline: auto;
+  padding: 32px 0 80px;
+  color: var(--text-light);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 38px;
+  color: #b6c5bc;
+  font-size: 12px;
+}
+
+.breadcrumb a {
+  color: var(--green-bright);
+  font-weight: 700;
+}
+
+.breadcrumb a:hover {
+  color: #c0f5d5;
+}
+
+/* Center the complete directory heading */
+.catalogue-heading {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.catalogue-heading .eyebrow {
+  margin-bottom: 16px;
+  color: #65d99a;
+}
+
+.catalogue-heading h1 {
+  margin: 0 0 12px;
+  color: var(--green-bright);
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -1.5px;
+  text-align: center;
+}
+
+.catalogue-heading p {
+  margin: 0;
+  color: var(--text-muted-light);
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* ---------- Catalogue Search ---------- */
+
+.catalogue-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 7px 7px 7px 16px;
+  border: 1px solid var(--dark-border);
+  border-radius: 13px;
+  background: var(--panel-bg);
+  color: #b6c5bc;
+}
+
+.catalogue-search input {
+  color: #f0f7f2;
+}
+
+.catalogue-search input::placeholder {
+  color: #aab8b0;
+}
+
+.catalogue-search .primary-button {
+  flex-shrink: 0;
+}
+
+/* ---------- Catalogue Filters ---------- */
+
+/*
+   Desktop layout:
+   Education | Category | Location
+   Apply filters (4 columns) | Reset (2 columns)
+*/
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: end;
+  gap: 18px;
+  width: 100%;
+  margin: 0 0 38px;
+  padding: 28px;
+  border: 1px solid var(--dark-border);
+  border-radius: 18px;
+  background: var(--panel-bg);
+}
+
+.filter-row label {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 2;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.filter-row label span {
+  color: #e0eae3;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.filter-row input,
+.filter-row select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid #d3e4d8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--heading);
+  font-size: 13px;
+}
+
+.filter-row input::placeholder {
+  color: #708276;
+  opacity: 1;
+}
+
+.filter-row input:focus,
+.filter-row select:focus {
+  border-color: #16a05b;
+  outline: 3px solid rgba(22, 160, 91, 0.2);
+}
+
+.filter-apply,
+.filter-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.filter-apply {
+  grid-column: span 4;
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #ffffff;
+}
+
+.filter-apply:hover {
+  border-color: var(--green-hover);
+  background: var(--green-hover);
+}
+
+.filter-reset {
+  grid-column: span 2;
+  border: 1px solid #526359;
+  background: transparent;
+  color: #e9f2ec;
+}
+
+.filter-reset:hover {
+  border-color: var(--green-bright);
+  background: #292f35;
+}
+
+/* ---------- Results Heading ---------- */
+
+.results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 24px;
+}
+
+.results-heading h2 {
+  margin: 0;
+  color: var(--green-bright);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.results-heading > span {
+  color: #b6c5bc;
+  font-size: 12px;
+}
+
+.filter-note {
+  margin: 0 0 20px;
+  color: var(--text-muted-light);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---------- Scholarship Details ---------- */
+
+.detail-page {
+  width: min(1480px, calc(100% - 64px));
+  min-height: 75vh;
+  margin-inline: auto;
+  padding: 35px 0 85px;
+  color: var(--text-light);
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: var(--green-bright);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.back-button:hover {
+  color: #c0f5d5;
+}
+
+.detail-hero {
+  padding: 42px;
+  border: 1px solid #cfead6;
+  border-radius: 22px;
+  background: linear-gradient(120deg, #f0faf2, #e2f7e8);
+}
+
+.detail-provider {
+  display: block;
+  margin-bottom: 12px;
+  color: #117545;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.detail-hero h1 {
+  max-width: 950px;
+  margin: 0 0 20px;
+  color: var(--heading);
+  font-size: clamp(29px, 4vw, 43px);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -1px;
+  overflow-wrap: anywhere;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 28px;
+  margin-top: 28px;
+}
+
+.detail-main {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.detail-panel,
+.detail-sidebar {
+  min-width: 0;
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+}
+
+.detail-panel h2,
+.detail-sidebar h2 {
+  margin: 0 0 16px;
+  color: var(--heading);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.detail-panel p,
+.detail-sidebar p {
+  color: #50675a;
+  font-size: 14px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.detail-panel p:last-child {
+  margin-bottom: 0;
+}
+
+.detail-panel strong {
+  color: var(--heading);
+}
+
+.detail-sidebar {
+  position: sticky;
+  top: 100px;
+}
+
+.official-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid #edf2ee;
+  color: #117545;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.official-link:last-of-type {
+  border-bottom: 0;
+}
+
+.official-link:hover {
+  color: #124b35;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.official-link svg {
+  flex-shrink: 0;
+}
+
+/* ---------- Laptop / Tablet ---------- */
+
+@media (max-width: 1050px) {
+  .header-inner {
+    width: calc(100% - 40px);
+  }
+
+  .hero-section {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 24px;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(36px, 5vw, 49px);
+    letter-spacing: -1.5px;
+  }
+
+  .section-container {
+    width: calc(100% - 48px);
+  }
+
+  .home-scholarships > .section-container {
+    width: calc(100% - 64px);
+  }
+
+  .catalogue-page {
+    width: calc(100% - 64px);
+  }
+
+  .scholarship-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+}
+
+/* ---------- Tablet Filters ---------- */
+
+@media (max-width: 900px) {
+  .filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .filter-row label {
+    grid-column: span 1;
+  }
+
+  .filter-row label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .filter-apply,
+  .filter-reset {
+    grid-column: span 1;
+  }
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 720px) {
+  .header-inner {
+    width: calc(100% - 32px);
+    min-height: 72px;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .brand-tagline {
+    font-size: 10px;
+  }
+
+  .header-nav {
+    gap: 14px;
+  }
+
+  .nav-link {
+    font-size: 12px;
+  }
+
+  .nav-cta {
+    display: none;
+  }
+
+  .hero-section {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: auto;
+    gap: 28px;
+    padding: 48px 24px 35px;
+    background-size: auto 100%;
+    background-position: 65% center;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(37px, 8vw, 48px);
+    letter-spacing: -1.5px;
+  }
+
+  .hero-content > p:not(.hero-note) {
+    font-size: 14px;
+  }
+
+  .hero-art img {
+    width: min(100%, 320px);
+    max-height: 250px;
+  }
+
+  .hero-search {
+    gap: 8px;
+    padding-left: 12px;
+  }
+
+  .hero-search input {
+    font-size: 12px;
+  }
+
+  .hero-search button {
+    padding: 12px;
+    font-size: 12px;
+  }
+
+  .section-container,
+  .home-scholarships > .section-container,
+  .catalogue-page,
+  .detail-page {
+    width: calc(100% - 32px);
+  }
+
+  .home-scholarships {
+    padding: 48px 0 56px;
+  }
+
+  .section-heading {
+    margin-bottom: 28px;
+  }
+
+  .section-heading h2 {
+    font-size: 27px;
+  }
+
+  .section-heading p {
+    font-size: 13px;
+  }
+
+  .scholarship-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .scholarship-card {
+    padding: 22px;
+  }
+
+  .catalogue-page,
+  .detail-page {
+    padding-top: 24px;
+    padding-bottom: 55px;
+  }
+
+  .breadcrumb {
+    margin-bottom: 25px;
+  }
+
+  .catalogue-heading h1 {
+    font-size: 33px;
+  }
+
+  .catalogue-search {
+    gap: 8px;
+    padding-left: 11px;
+  }
+
+  .catalogue-search input {
+    font-size: 12px;
+  }
+
+  .catalogue-search .primary-button {
+    padding: 11px 12px;
+    font-size: 12px;
+  }
+
+  .filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .filter-row label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .filter-row label {
+    grid-column: span 1;
+  }
+
+  .filter-apply,
+  .filter-reset {
+    grid-column: span 1;
+    width: 100%;
+  }
+
+  .results-heading h2 {
+    font-size: 20px;
+  }
+
+  .results-heading > span {
+    text-align: right;
+  }
+
+  .detail-hero {
+    padding: 26px 22px;
+  }
+
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .detail-panel,
+  .detail-sidebar {
+    padding: 22px;
+  }
+
+  .detail-sidebar {
+    position: static;
+  }
+}
+
+/* ---------- Small Phones ---------- */
+
+@media (max-width: 480px) {
+  .filter-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .filter-row label,
+  .filter-row label:first-child,
+  .filter-apply,
+  .filter-reset {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .header-inner {
+    width: calc(100% - 24px);
+  }
+
+  .header-nav {
+    gap: 10px;
+  }
+
+  .nav-link {
+    font-size: 11px;
+  }
+
+  .brand-name {
+    font-size: 13px;
+  }
+
+  .hero-section {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .hero-content h1 {
+    font-size: 36px;
+  }
+
+  .hero-search {
+    flex-wrap: wrap;
+  }
+
+  .hero-search input {
+    flex: 1 1 calc(100% - 45px);
+  }
+
+  .hero-search button {
+    width: 100%;
+  }
+
+  .scholarship-card-footer {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---------- Reduced Motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

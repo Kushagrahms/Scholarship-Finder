@@ -1,0 +1,14 @@
+
+.venv/
+**/.venv/
+**/node_modules/
+**/dist/
+**/__pycache__/
+**/*.py[cod]
+.git/
+**/.env
+.env
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+project_structure.txt
