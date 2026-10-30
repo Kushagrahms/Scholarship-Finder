@@ -1,0 +1,27 @@
+{
+  "input_records": 49,
+  "output_records": 47,
+  "automatic_merge_groups_reduced_by": 2,
+  "review_candidates": [],
+  "automatic_merges": [
+    {
+      "record_a": 10,
+      "record_b": 32,
+      "title_a": "National Scholarship For Post Graduate Studies (Merit Based Scheme)",
+      "title_b": "National Scholarship for Post Graduate Studies",
+      "decision": "merge",
+      "similarity": 1.0,
+      "reason": "High title similarity, equivalent known provider, no conflicts"
+    },
+    {
+      "record_a": 11,
+      "record_b": 33,
+      "title_a": "Ishan Uday Special Scholarship Scheme For NER (Merit Based Scheme)",
+      "title_b": "“IshanUday” Special Scholarship Scheme for North Eastern Region",
+      "decision": "merge",
+      "similarity": 1.0,
+      "reason": "High title similarity, equivalent known provider, no conflicts"
+    }
+  ],
+  "note": "Review candidates remain separate in the output. No uncertain pair is automatically merged."
+}

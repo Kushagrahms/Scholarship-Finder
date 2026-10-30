@@ -1,32 +1,44 @@
+
 import csv
 import json
+import re
+import requests
+
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
-import requests
+from html import unescape
+
 
 # =========================================================
-# EXACT PATHS: MATCH YOUR EXISTING PROJECT
+# PATHS
 # =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR/"data"
+DATA_DIR = BASE_DIR / "data"
 
-INPUT_FILE = DATA_DIR/"normalized_scholarships.json"
-AUDIT_FILE = DATA_DIR/"scholarship_audit.csv"
-MANUAL_FILE = DATA_DIR/"manual_verification.csv"
+INPUT_FILE = DATA_DIR / "normalized_scholarships.json"
+VERIFIED_FILE = DATA_DIR / "verified_scholarships.json"
+AUDIT_FILE = DATA_DIR / "scholarship_audit.csv"
+SUMMARY_FILE = DATA_DIR / "audit_summary.json"
 
-REQUIRED_FIELDS=[
-    "title", 
-    "provider",
+REQUEST_TIMEOUT = 12
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 ScholarshipFinder/1.0"
+}
+
+REQUIRED_FIELDS = [
+    "title",
     "source",
     "source_url",
 ]
 
-REVIEW_FIELDS = [
-    "deadline",
+OPTIONAL_URL_FIELDS = [
     "application_url",
     "detail_url",
+    "guidelines_url",
+    "faq_url",
 ]
 
 DATE_FIELDS = [
@@ -34,195 +46,415 @@ DATE_FIELDS = [
     "deadline",
 ]
 
-URL_FIELDS = [
-    "source_url",
-    "application_url",
-    "detail_url",
-    "guidelines_url",
-    "faq_url",
-]
 
-REQUEST_TIMEOUT = 10
+# =========================================================
+# HELPERS
+# =========================================================
 
 def is_missing(value):
-    return value is None or( isinstance(value,str) and not value.strip())
+    return value is None or (
+        isinstance(value, str) and not value.strip()
+    )
 
-def valid_url_format(value):
-    if not isinstance(value,str) or not value.strip():
+
+def clean_text(value):
+    if value is None:
+        return ""
+
+    return " ".join(str(value).split()).strip()
+
+
+def normalize_title(value):
+    value = clean_text(value).lower()
+    value = re.sub(r"[^a-z0-9\s]", " ", value)
+    return " ".join(value.split())
+
+
+def valid_url_format(url):
+    if not isinstance(url, str):
         return False
 
-    parsed = urlparse(value.strip())
+    parsed = urlparse(url.strip())
 
-    return(parsed.scheme in ("http","https") and bool(parsed.netloc) and "." in parsed.netloc)
+    return (
+        parsed.scheme in ("http", "https")
+        and bool(parsed.netloc)
+    )
 
-def check_live_url(url):
+
+def fetch_page(url):
+    """
+    Fetch a webpage and return its status, final URL and text.
+    """
+
     try:
-        response = requests.get(url,timeout=REQUEST_TIMEOUT, allow_redirects=True, 
-                                headers={"User-Agent":"ScholarshipFinderAudit/1.0"}, stream=True,)
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=REQUEST_TIMEOUT,
+            allow_redirects=True,
+        )
+
         status = response.status_code
-        finale_url = response.url
-        response.close()
+        final_url = response.url
 
-        if status in (403,429):
-            result = "BLOCKED_OR_RATE_LIMITED"
-        elif status >=400 :
-            result = "HTTP_ERROR"
-        else:
-            result = "RESPONDS"
+        if status in (403, 429):
+            return "BLOCKED_OR_RATE_LIMITED", status, final_url, ""
 
-        return result,status,finale_url
+        if status >= 400:
+            return "HTTP_ERROR", status, final_url, ""
+
+        content_type = response.headers.get("Content-Type", "")
+
+        if "html" not in content_type.lower():
+            return "NON_HTML_RESPONSE", status, final_url, ""
+
+        html = response.text
+
+        # Remove scripts and styles before checking page text.
+        html = re.sub(
+            r"<(script|style).*?>.*?</\1>",
+            " ",
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        text = re.sub(r"<[^>]+>", " ", html)
+        text = unescape(text)
+        text = clean_text(text)
+
+        return "RESPONDS", status, final_url, text
+
     except requests.exceptions.Timeout:
-        return "TIMEOUT","",""
+        return "TIMEOUT", "", "", ""
 
     except requests.exceptions.RequestException as error:
-        return(
-            "CONNECTION_ERROR: "+type(error).__name__,"","",
+        return (
+            "CONNECTION_ERROR",
+            "",
+            "",
+            str(error),
         )
+
+
+def title_found_on_page(title, page_text):
+    """
+    Check whether the normalized title appears in page text.
+    """
+
+    normalized_title = normalize_title(title)
+    normalized_page = normalize_title(page_text)
+
+    if not normalized_title or not normalized_page:
+        return False
+
+    return normalized_title in normalized_page
+
+
+def add_issue(issues, record_number, scholarship, field, value, issue, notes=""):
+    issues.append({
+        "record_number": record_number,
+        "title": scholarship.get("title", ""),
+        "provider": scholarship.get("provider", ""),
+        "source": scholarship.get("source", ""),
+        "field": field,
+        "value": value if value is not None else "",
+        "issue": issue,
+        "notes": notes,
+        "source_url": scholarship.get("source_url", ""),
+    })
+
+
+# =========================================================
+# VERIFY ONE RECORD
+# =========================================================
+
+def verify_record(index, scholarship, issues, seen):
+    reasons = []
+
+    def reject(reason):
+        reasons.append(reason)
+
+    title = clean_text(scholarship.get("title"))
+    source = clean_text(scholarship.get("source"))
+    source_url = clean_text(scholarship.get("source_url"))
+
+    # -----------------------------------------------------
+    # 1. Required fields
+    # -----------------------------------------------------
+
+    for field in REQUIRED_FIELDS:
+        value = scholarship.get(field)
+
+        if is_missing(value):
+            add_issue(
+                issues,
+                index,
+                scholarship,
+                field,
+                value,
+                "MISSING_REQUIRED_FIELD",
+            )
+            reject(f"Missing required field: {field}")
+
+    if not title or not source_url:
+        return False, reasons
+
+    # Provider is allowed to be unknown at this stage.
+    # It must not be guessed from the aggregator name.
+
+    # -----------------------------------------------------
+    # 2. Date format validation
+    # -----------------------------------------------------
+
+    for field in DATE_FIELDS:
+        value = scholarship.get(field)
+
+        if is_missing(value):
+            continue
+
+        try:
+            datetime.strptime(str(value), "%Y-%m-%d")
+
+        except ValueError:
+            add_issue(
+                issues,
+                index,
+                scholarship,
+                field,
+                value,
+                "INVALID_DATE_FORMAT",
+                "Expected YYYY-MM-DD.",
+            )
+            reject(f"Invalid date format: {field}")
+
+    # -----------------------------------------------------
+    # 3. URL format validation
+    # -----------------------------------------------------
+
+    for field in ["source_url"] + OPTIONAL_URL_FIELDS:
+        url = scholarship.get(field)
+
+        if is_missing(url):
+            continue
+
+        if not valid_url_format(url):
+            add_issue(
+                issues,
+                index,
+                scholarship,
+                field,
+                url,
+                "INVALID_URL_FORMAT",
+            )
+
+            if field == "source_url":
+                reject("Invalid source URL")
+
+    if reasons:
+        return False, reasons
+
+    # -----------------------------------------------------
+    # 4. Check source page availability
+    # -----------------------------------------------------
+
+    result, status, final_url, page_text = fetch_page(source_url)
+
+    if result != "RESPONDS":
+        add_issue(
+            issues,
+            index,
+            scholarship,
+            "source_url",
+            source_url,
+            result,
+            f"HTTP status: {status}; final URL: {final_url}",
+        )
+
+        reject("Source page could not be verified")
+        return False, reasons
+
+    # -----------------------------------------------------
+    # 5. Check scholarship title on source page
+    # -----------------------------------------------------
+
+    if not title_found_on_page(title, page_text):
+        add_issue(
+            issues,
+            index,
+            scholarship,
+            "title",
+            title,
+            "TITLE_NOT_FOUND_ON_SOURCE_PAGE",
+            "The exact normalized title was not found in the fetched page text.",
+        )
+
+        reject("Scholarship title not found on source page")
+
+    # -----------------------------------------------------
+    # 6. Duplicate detection
+    # -----------------------------------------------------
+
+    duplicate_key = (
+        source.lower(),
+        normalize_title(title),
+    )
+
+    if duplicate_key in seen:
+        add_issue(
+            issues,
+            index,
+            scholarship,
+            "title",
+            title,
+            "DUPLICATE_RECORD",
+            f"Matches record {seen[duplicate_key]}.",
+        )
+
+        reject("Duplicate record")
+
+    else:
+        seen[duplicate_key] = index
+
+    # -----------------------------------------------------
+    # 7. Check optional URLs
+    # -----------------------------------------------------
+
+    for field in OPTIONAL_URL_FIELDS:
+        url = scholarship.get(field)
+
+        if is_missing(url):
+            # Missing application links or deadlines are not
+            # grounds for rejection.
+            continue
+
+        if not valid_url_format(url):
+            add_issue(
+                issues,
+                index,
+                scholarship,
+                field,
+                url,
+                "INVALID_URL_FORMAT",
+            )
+            continue
+
+        url_result, url_status, url_final, _ = fetch_page(url)
+
+        if url_result != "RESPONDS":
+            add_issue(
+                issues,
+                index,
+                scholarship,
+                field,
+                url,
+                url_result,
+                f"HTTP status: {url_status}; final URL: {url_final}",
+            )
+
+    # -----------------------------------------------------
+    # 8. Final decision
+    # -----------------------------------------------------
+
+    return len(reasons) == 0, reasons
+
 
 # =========================================================
 # MAIN AUDIT
 # =========================================================
 
 def main():
-    print("\n======================================")
-    print("SCHOLARSHIP FINDER - DATA AUDIT")
-    print("======================================")
-    print("Input:", INPUT_FILE)
+
+    print("\n========================================")
+    print("SCHOLARSHIP FINDER - AUTOMATED AUDIT")
+    print("========================================")
 
     if not INPUT_FILE.exists():
-        print("\nERROR: Normalized file not found.")
-        print("Expected path:", INPUT_FILE)
-        print("\nRun this first:")
-        print("python normalizer.py")
+        print("\nERROR: Normalized JSON file not found.")
+        print("Expected:", INPUT_FILE)
         return
 
     try:
-        with INPUT_FILE.open("r",encoding="utf-8") as file:
+        with INPUT_FILE.open("r", encoding="utf-8") as file:
             scholarships = json.load(file)
 
     except json.JSONDecodeError:
-        print("ERROR: The normalized JSON is invalid.")
+        print("\nERROR: Invalid JSON file.")
         return
 
-    if not isinstance(scholarships,list):
-        print("ERROR: Expected a JSON list of scholarships.")
-        return
-    if not all(isinstance(itme,dict )for itme in scholarships):
-        print("ERROR: Every record must be a JSON object.")
+    if not isinstance(scholarships, list):
+        print("\nERROR: Expected a list of scholarship records.")
         return
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    verified_records = []
     audit_rows = []
-    manual_rows=[]
-    seen={}
+    seen = {}
+
+    rejected_count = 0
 
     # -----------------------------------------------------
-    # Check each scholarship
+    # Process records
     # -----------------------------------------------------
-    for index,scholarship in enumerate(scholarships,start=1):
-        title = scholarship.get("title") or ""
-        provider = scholarship.get("provider") or ""
-        source = scholarship.get("source") or ""
-        source_url = scholarship.get("source_url") or ""
 
-        def add_issue(field,value,issue,notes=""):
-            audit_rows.append({
-                "record_number":index,
-                "title":title,
-                "provider":provider,
-                "field":field,
-                "value":value if value is not None else "",
-                "issue":issue,
-                "notes":notes,
-                "source_url":source_url,
-            })
-        for field in REQUIRED_FIELDS:
-            value = scholarship.get(field)
+    for index, scholarship in enumerate(scholarships, start=1):
 
-            if is_missing(value):
-                add_issue(
-                    field,value,"MISSING_REQUIRED_FIELD",
-                )
-        for field in REVIEW_FIELDS:
-            value = scholarship.get(field)
-
-            if is_missing(value):
-                add_issue(
-                    field,value,"REVIEW_MISSING_VALUE","Check the official source; it may not publish this field.",
-                )
-        for field in DATE_FIELDS:
-            value = scholarship.get(field)
-
-            if is_missing(value):
-                continue
-
-            try:
-                datetime.strptime(str(value), "%Y-%m-%d")
-            except ValueError:
-                add_issue(
-                    field,value,"INVALID_DATE_FORMAT","Expected YYYY-MM-DD, e.g. 2026-10-31.",
-                )
-        for field in URL_FIELDS:
-            url = scholarship.get(field)
-
-            if is_missing(url):
-                continue
-
-            if not valid_url_format(url):
-                add_issue(
-                    field,url,"INVALID_URL_FORMAT",
-                )
-                continue
-            result ,status,final_url = check_live_url(url)
-
-            if result != "RESPONDS":
-                add_issue(
-                    field,url,result,f"HTTP status: {status}; final URL: {final_url}",
-                )
-        # E. Exact duplicate check
-        # Use source + normalized title, as in your validator.
-        duplicate_key = (
-            " ".join(str(source).lower().split()),
-            " ".join(str(title).lower().split()),
+        print(
+            f"\nChecking {index}/{len(scholarships)}: "
+            f"{scholarship.get('title', 'Untitled')}"
         )
 
-        if title and duplicate_key in seen:
-            add_issue(
-                "title",
-                title,
-                "POSSIBLE_EXACT_DUPLICATE",
-                f"Matches record {seen[duplicate_key]}. Review before removing.",
-            )
-        elif title:
-            seen[duplicate_key] = index
+        if not isinstance(scholarship, dict):
+            rejected_count += 1
+            continue
 
-        # F. Create a manual verification row.
-        # Fill the comparison columns after checking the
-        # original official website.
-        manual_rows.append({
-            "record_number": index,
-            "title": title,
-            "provider": provider,
-            "opening_date": scholarship.get("opening_date") or "",
-            "deadline": scholarship.get("deadline") or "",
-            "source": source,
-            "source_url": source_url,
-            "application_url": scholarship.get("application_url") or "",
-            "title_match": "",
-            "provider_match": "",
-            "deadline_match": "",
-            "link_correct": "",
-            "notes": "",
-        })
+        accepted, reasons = verify_record(
+            index,
+            scholarship,
+            audit_rows,
+            seen,
+        )
+
+        if accepted:
+            verified_record = scholarship.copy()
+
+            verified_record["verification"] = {
+                "status": "AUTOMATED_CHECKS_PASSED",
+                "verified_at": datetime.now().isoformat(),
+                "method": "Source URL availability and title match",
+            }
+
+            verified_records.append(verified_record)
+            print("Result: ACCEPTED")
+
+        else:
+            rejected_count += 1
+            print("Result: REJECTED")
+            for reason in reasons:
+                print(" -", reason)
 
     # -----------------------------------------------------
-    # Write audit report
+    # Save verified records
+    # -----------------------------------------------------
+
+    with VERIFIED_FILE.open("w", encoding="utf-8") as file:
+        json.dump(
+            verified_records,
+            file,
+            indent=4,
+            ensure_ascii=False,
+        )
+
+    # -----------------------------------------------------
+    # Save audit CSV
     # -----------------------------------------------------
 
     audit_columns = [
         "record_number",
         "title",
         "provider",
+        "source",
         "field",
         "value",
         "issue",
@@ -231,58 +463,59 @@ def main():
     ]
 
     with AUDIT_FILE.open(
-        "w", newline="", encoding="utf-8-sig"
+        "w",
+        newline="",
+        encoding="utf-8-sig",
     ) as file:
-        writer = csv.DictWriter(file, fieldnames=audit_columns)
+
+        writer = csv.DictWriter(
+            file,
+            fieldnames=audit_columns,
+        )
+
         writer.writeheader()
         writer.writerows(audit_rows)
 
     # -----------------------------------------------------
-    # Write manual verification sheet
+    # Save summary
     # -----------------------------------------------------
 
-    manual_columns = [
-        "record_number",
-        "title",
-        "provider",
-        "opening_date",
-        "deadline",
-        "source",
-        "source_url",
-        "application_url",
-        "title_match",
-        "provider_match",
-        "deadline_match",
-        "link_correct",
-        "notes",
-    ]
+    summary = {
+        "total_records": len(scholarships),
+        "accepted_records": len(verified_records),
+        "rejected_records": rejected_count,
+        "audit_issues": len(audit_rows),
+        "completed_at": datetime.now().isoformat(),
+        "verification_note": (
+            "Automated checks do not establish definitive "
+            "official authenticity. Source-page availability "
+            "and title matching are preliminary evidence only."
+        ),
+    }
 
-    with MANUAL_FILE.open(
-        "w", newline="", encoding="utf-8-sig"
-    ) as file:
-        writer = csv.DictWriter(file, fieldnames=manual_columns)
-        writer.writeheader()
-        writer.writerows(manual_rows)
+    with SUMMARY_FILE.open("w", encoding="utf-8") as file:
+        json.dump(summary, file, indent=4)
 
     # -----------------------------------------------------
-    # Summary
+    # Terminal summary
     # -----------------------------------------------------
 
-    print("\nRecords checked:", len(scholarships))
-    print("Audit issues recorded:", len(audit_rows))
-    print("Audit report:", AUDIT_FILE)
-    print("Manual verification sheet:", MANUAL_FILE)
+    print("\n========================================")
+    print("AUDIT COMPLETED")
+    print("========================================")
 
-    print("\nAudit completed.")
-    print("Review each issue; not every issue is a scraper bug.")
+    print("Total records:", len(scholarships))
+    print("Accepted records:", len(verified_records))
+    print("Rejected records:", rejected_count)
+    print("Audit issues:", len(audit_rows))
+
+    print("\nOutput files:")
+    print("Verified JSON:", VERIFIED_FILE)
+    print("Audit CSV:", AUDIT_FILE)
+    print("Summary JSON:", SUMMARY_FILE)
+
+    print("\n========================================")
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-        

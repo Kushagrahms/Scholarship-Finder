@@ -10,7 +10,7 @@ class ScholarshipResponse(BaseModel):
 
     id: int
     title: str
-    provider: str
+    provider: str | None = None
     description: str | None = None
     objective: str | None = None
     eligibility: str | None = None
@@ -37,6 +37,10 @@ class ScholarshipResponse(BaseModel):
     scraped_at: datetime | None = None
     raw_metadata: dict[str, Any] | None = None
 
+    sources: list[str] | None = None
+    source_references: list[dict[str, Any]] | None = None
+    source_metadata: list[dict[str, Any]] | None = None
+    
     status: str
     first_seen: datetime
     last_seen: datetime

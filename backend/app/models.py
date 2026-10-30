@@ -27,7 +27,7 @@ class Scholarship(Base):
 
     # Core scholarship information
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    provider: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     objective: Mapped[str | None] = mapped_column(Text, nullable=True)
     eligibility: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -65,6 +65,18 @@ class Scholarship(Base):
         DateTime(timezone=True), nullable=True
     )
     raw_metadata: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+        # Provenance information from the deduplicated dataset
+    sources: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True
+    )
+
+    source_references: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON, nullable=True
+    )
+
+    source_metadata: Mapped[list[dict[str, Any]] | None] = mapped_column(
         JSON, nullable=True
     )
 

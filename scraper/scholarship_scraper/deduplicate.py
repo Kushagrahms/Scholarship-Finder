@@ -1,43 +1,59 @@
 
+"""Conservative scholarship deduplication.
+
+Responsibilities:
+- Identify likely duplicate scholarships.
+- Protect meaningful eligibility variants.
+- Preserve source URLs and raw metadata.
+- Automatically merge only high-confidence matches.
+- Keep uncertain matches separate and save them for review.
+"""
+
 import json
 import re
+
 from difflib import SequenceMatcher
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
+
 INPUT_FILE = DATA_DIR / "normalized_scholarships.json"
+
 OUTPUT_FILE = DATA_DIR / "deduplicated_scholarships.json"
 
-MERGE_THRESHOLD = 0.95
+REVIEW_FILE = DATA_DIR / "deduplication_review.json"
+
+MERGE_THRESHOLD = 0.96
 REVIEW_THRESHOLD = 0.90
 
 
+# =========================================================
+# TEXT NORMALIZATION
+# =========================================================
+
 def normalize_text(value):
-    """Normalize wording without discarding meaningful differences."""
+
     if value is None:
         return ""
 
-    text = str(value).lower().replace("&", " and ")
-
-    # Normalize known naming variations.
-    text = re.sub(r"ishan\s*uday", "ishan uday", text)
-    text = re.sub(r"\bn\s*e\s*r\b", "north eastern region", text)
-    text = re.sub(r"\bner\b", "north eastern region", text)
-
-    # Convert punctuation and hyphens into spaces.
-    text = re.sub(r"[^\w\s]", " ", text)
-
-    return " ".join(text.split())
-
-
-def title_key(value):
-    """Remove generic words for a secondary title comparison."""
-    text = normalize_text(value)
+    text = str(value).casefold().replace("&", " and ")
 
     text = re.sub(
-        r"\bmerit based scheme\b|\bschemes?\b|\bscholarships?\b",
+        r"\bishan\s*uday\b",
+        "ishan uday",
+        text,
+    )
+
+    text = re.sub(
+        r"\bn\s*e\s*r\b|\bner\b",
+        "north eastern region",
+        text,
+    )
+
+    text = re.sub(
+        r"[^\w\s]",
         " ",
         text,
     )
@@ -45,15 +61,35 @@ def title_key(value):
     return " ".join(text.split())
 
 
-def title_similarity(title_a, title_b):
-    a = normalize_text(title_a)
-    b = normalize_text(title_b)
+def title_key(value):
 
-    if not a or not b:
+    text = normalize_text(value)
+
+    text = re.sub(
+        r"\b(merit based|welfare based) scheme\b",
+        " ",
+        text,
+    )
+
+    text = re.sub(
+        r"\bschemes?\b|\bscholarships?\b",
+        " ",
+        text,
+    )
+
+    return " ".join(text.split())
+
+
+def similarity(title_a, title_b):
+
+    a1 = normalize_text(title_a)
+    b1 = normalize_text(title_b)
+
+    if not a1 or not b1:
         return 0.0
 
     return max(
-        SequenceMatcher(None, a, b).ratio(),
+        SequenceMatcher(None, a1, b1).ratio(),
         SequenceMatcher(
             None,
             title_key(title_a),
@@ -62,143 +98,277 @@ def title_similarity(title_a, title_b):
     )
 
 
-def has_conflicting_variant(title_a, title_b):
-    """Detect variants that must never be merged automatically."""
+# =========================================================
+# VARIANT PROTECTION
+# =========================================================
+
+def has_opposing_variant(title_a, title_b):
+
     a = normalize_text(title_a)
     b = normalize_text(title_b)
 
-    variants = [
-        # School versus college, including plural forms.
+    opposing_pairs = [
+
         (r"\bschools?\b", r"\bcolleges?\b"),
 
-        # Degree versus diploma.
         (r"\bdegrees?\b", r"\bdiplomas?\b"),
 
-        # Undergraduate versus postgraduate.
         (
             r"\bunder\s*graduate\b|\bug\b",
             r"\bpost\s*graduate\b|\bpg\b",
         ),
 
-        # Pre-matric versus post-matric.
         (
             r"\bpre\s*matric\b",
             r"\bpost\s*matric\b",
         ),
 
-        # Other explicitly different variants.
         (r"\bboys?\b", r"\bgirls?\b"),
+
         (r"\bmales?\b", r"\bfemales?\b"),
+
+        (
+            r"\bsc\b|\bscheduled caste\b",
+            r"\bst\b|\bscheduled tribe\b",
+        ),
     ]
 
-    for first_pattern, second_pattern in variants:
-        first_a = bool(re.search(first_pattern, a))
-        second_a = bool(re.search(second_pattern, a))
-        first_b = bool(re.search(first_pattern, b))
-        second_b = bool(re.search(second_pattern, b))
+    for left, right in opposing_pairs:
+
+        left_a = bool(re.search(left, a))
+        right_a = bool(re.search(right, a))
+
+        left_b = bool(re.search(left, b))
+        right_b = bool(re.search(right, b))
 
         if (
-            (first_a and second_b)
-            or (second_a and first_b)
+            (left_a and right_b)
+            or (right_a and left_b)
         ):
             return True
 
     return False
 
 
+# =========================================================
+# PROVIDER NORMALIZATION
+# =========================================================
+
+def canonical_provider(value):
+
+    text = normalize_text(value)
+
+    if not text:
+        return ""
+
+    aliases = {
+
+        "ugc":
+            "university grants commission",
+
+        "university grants commission":
+            "university grants commission",
+
+        "aicte":
+            "all india council for technical education",
+
+        "all india council for technical education":
+            "all india council for technical education",
+
+        "mha":
+            "ministry of home affairs",
+
+        "ministry of home affairs":
+            "ministry of home affairs",
+    }
+
+    return aliases.get(text, text)
+
+
+# =========================================================
+# CONFLICT CHECKING
+# =========================================================
+
 def conflicting_details(a, b):
-    """Return populated fields whose normalized values disagree."""
-    fields = [
+
+    conflicts = []
+
+    fields = (
         "amount",
+        "amount_text",
         "education_level",
         "category",
         "location",
         "income_requirement",
-    ]
-
-    conflicts = []
+        "tenure",
+    )
 
     for field in fields:
+
         value_a = normalize_text(a.get(field))
         value_b = normalize_text(b.get(field))
 
-        if value_a and value_b and value_a != value_b:
+        if (
+            value_a
+            and value_b
+            and value_a != value_b
+        ):
             conflicts.append(field)
 
     return conflicts
 
 
-def provider_matches(a, b):
-    provider_a = normalize_text(a.get("provider"))
-    provider_b = normalize_text(b.get("provider"))
-
-    return bool(
-        provider_a
-        and provider_b
-        and provider_a == provider_b
-    )
-
+# =========================================================
+# RECORD COMPARISON
+# =========================================================
 
 def compare_records(a, b):
-    title_a = a.get("title", "")
-    title_b = b.get("title", "")
-    score = title_similarity(title_a, title_b)
+
+    title_a = a.get("title")
+    title_b = b.get("title")
+
+    score = similarity(title_a, title_b)
 
     if not title_a or not title_b:
         return "different", score, "Missing title"
 
-    # Variant protection takes priority over title similarity.
-    if has_conflicting_variant(title_a, title_b):
-        return "different", score, "Different scholarship variants"
+    if has_opposing_variant(title_a, title_b):
+
+        return (
+            "different",
+            score,
+            "Different protected scholarship variants",
+        )
 
     conflicts = conflicting_details(a, b)
 
     if conflicts:
+
         return (
             "different",
             score,
             "Conflicting details: " + ", ".join(conflicts),
         )
 
-    same_provider = provider_matches(a, b)
+    provider_a = canonical_provider(a.get("provider"))
+    provider_b = canonical_provider(b.get("provider"))
 
-    if score >= MERGE_THRESHOLD and same_provider:
+    if (
+        provider_a
+        and provider_b
+        and provider_a != provider_b
+    ):
+
+        return (
+            "different",
+            score,
+            "Different known providers",
+        )
+
+    if (
+        score >= MERGE_THRESHOLD
+        and provider_a
+        and provider_a == provider_b
+    ):
+
         return (
             "merge",
             score,
-            "95%+ title similarity, matching provider, no conflicts",
-        )
-
-    if score >= MERGE_THRESHOLD and not same_provider:
-        return (
-            "review",
-            score,
-            "High title similarity but provider is missing or differs",
+            "High title similarity, equivalent known provider, no conflicts",
         )
 
     if score >= REVIEW_THRESHOLD:
+
+        if not provider_a or not provider_b:
+
+            return (
+                "review",
+                score,
+                "Provider missing on at least one record; do not auto-merge",
+            )
+
         return (
             "review",
             score,
-            "Title similarity is at least 90%; needs verification",
+            "High title similarity; requires confirmation",
         )
 
-    return "different", score, "Below review threshold"
+    return (
+        "different",
+        score,
+        "Below review threshold",
+    )
 
 
-def merge_records(a, b):
-    """Combine records while retaining missing fields and source details."""
-    merged = dict(a)
+# =========================================================
+# MERGING HELPERS
+# =========================================================
 
-    for key, value in b.items():
-        if merged.get(key) in (None, "", [], {}):
-            if value not in (None, "", [], {}):
+def nonempty(value):
+
+    return value not in (None, "", [], {})
+
+
+def make_source_reference(record):
+
+    fields = (
+        "source",
+        "source_url",
+        "detail_url",
+        "application_url",
+        "guidelines_url",
+        "faq_url",
+        "scraped_at",
+    )
+
+    return {
+        key: record.get(key)
+        for key in fields
+        if nonempty(record.get(key))
+    }
+
+
+def merge_records(records):
+
+    """Merge fields without losing original source provenance."""
+
+    merged = dict(records[0])
+
+    protected_fields = {
+        "raw_metadata",
+        "source",
+        "source_url",
+        "detail_url",
+        "application_url",
+        "guidelines_url",
+        "faq_url",
+        "sources",
+        "source_references",
+        "source_metadata",
+        "alternate_titles",
+    }
+
+    # Fill missing ordinary fields.
+    for record in records[1:]:
+
+        for key, value in record.items():
+
+            if key in protected_fields:
+                continue
+
+            if (
+                not nonempty(merged.get(key))
+                and nonempty(value)
+            ):
                 merged[key] = value
 
-    # Preserve alternate titles.
     titles = set()
+    sources = set()
+    source_refs = []
+    source_metadata = []
 
-    for record in (a, b):
+    for record in records:
+
         title = record.get("title")
 
         if title:
@@ -207,105 +377,172 @@ def merge_records(a, b):
         existing_titles = record.get("alternate_titles", [])
 
         if isinstance(existing_titles, list):
+
             titles.update(
                 item for item in existing_titles if item
             )
+
+        source = record.get("source")
+
+        if source:
+            sources.add(source)
+
+        existing_sources = record.get("sources", [])
+
+        if isinstance(existing_sources, list):
+
+            sources.update(
+                item for item in existing_sources if item
+            )
+
+        reference = make_source_reference(record)
+
+        if reference and reference not in source_refs:
+            source_refs.append(reference)
+
+        metadata = record.get("raw_metadata")
+
+        if nonempty(metadata):
+
+            entry = {
+                "source": source,
+                "metadata": metadata,
+            }
+
+            if entry not in source_metadata:
+                source_metadata.append(entry)
+
+        # Preserve already merged provenance if this function
+        # is ever applied to records that were merged previously.
+        for reference in record.get("source_references", []):
+            if reference not in source_refs:
+                source_refs.append(reference)
+
+        for entry in record.get("source_metadata", []):
+            if entry not in source_metadata:
+                source_metadata.append(entry)
 
     titles.discard(merged.get("title"))
 
     if titles:
         merged["alternate_titles"] = sorted(titles)
 
-    # Preserve source names.
-    sources = set()
-
-    for record in (a, b):
-        source = record.get("source")
-
-        if isinstance(source, str) and source:
-            sources.add(source)
-
-        existing_sources = record.get("sources", [])
-
-        if isinstance(existing_sources, list):
-            sources.update(
-                item for item in existing_sources if item
-            )
-
     if sources:
         merged["sources"] = sorted(sources)
+
+    if source_refs:
+        merged["source_references"] = source_refs
+
+    if source_metadata:
+        merged["source_metadata"] = source_metadata
 
     return merged
 
 
+# =========================================================
+# MAIN
+# =========================================================
+
 def main():
+
     if not INPUT_FILE.exists():
-        print(f"ERROR: Input file not found:\n{INPUT_FILE}")
-        print("Run normalizer.py first.")
-        return
 
-    with open(INPUT_FILE, "r", encoding="utf-8") as file:
-        scholarships = json.load(file)
+        raise SystemExit(
+            f"ERROR: Input not found: {INPUT_FILE}\n"
+            "Run normalizer.py first."
+        )
 
-    if not isinstance(scholarships, list):
-        print("ERROR: Expected a JSON list of scholarship records.")
-        return
+    try:
 
-    if not all(isinstance(item, dict) for item in scholarships):
-        print("ERROR: Every scholarship record must be a JSON object.")
-        return
+        with INPUT_FILE.open("r", encoding="utf-8") as handle:
+            records = json.load(handle)
 
-    # Compare every original pair before merging anything.
+    except json.JSONDecodeError as exc:
+
+        raise SystemExit(
+            f"ERROR: Invalid JSON in {INPUT_FILE}: {exc}"
+        )
+
+    if (
+        not isinstance(records, list)
+        or any(not isinstance(record, dict) for record in records)
+    ):
+
+        raise SystemExit(
+            "ERROR: Expected a JSON list containing only objects."
+        )
+
     pair_results = []
 
-    for i in range(len(scholarships)):
-        for j in range(i + 1, len(scholarships)):
+    # Compare every pair.
+    for i in range(len(records)):
+
+        for j in range(i + 1, len(records)):
+
             decision, score, reason = compare_records(
-                scholarships[i],
-                scholarships[j],
+                records[i],
+                records[j],
             )
 
             if decision in ("merge", "review"):
-                pair_results.append(
-                    (i, j, decision, score, reason)
-                )
 
-    # Process strongest matches first.
-    merge_pairs = sorted(
+                pair_results.append({
+
+                    "record_a": i + 1,
+                    "record_b": j + 1,
+
+                    "title_a": records[i].get("title"),
+                    "title_b": records[j].get("title"),
+
+                    "decision": decision,
+
+                    "similarity": round(score, 4),
+
+                    "reason": reason,
+                })
+
+    # Automatic merge candidates.
+    merge_candidates = sorted(
+
         (
-            item for item in pair_results
-            if item[2] == "merge"
+            item
+            for item in pair_results
+            if item["decision"] == "merge"
         ),
-        key=lambda item: item[3],
+
+        key=lambda item: item["similarity"],
+
         reverse=True,
     )
 
-    # Each group represents records considered duplicates.
-    parent = list(range(len(scholarships)))
+    parent = list(range(len(records)))
 
     def find(index):
+
         while parent[index] != index:
+
             parent[index] = parent[parent[index]]
             index = parent[index]
+
         return index
 
-    def group_members(root):
+    def members(root):
+
         return [
-            i for i in range(len(scholarships))
-            if find(i) == root
+            index
+            for index in range(len(records))
+            if find(index) == root
         ]
 
-    def can_join_groups(root_a, root_b):
-        members_a = group_members(root_a)
-        members_b = group_members(root_b)
+    def can_join(root_a, root_b):
 
-        # Every cross-group pair must independently qualify
-        # for merging. This prevents unsafe chain-based merges.
-        for i in members_a:
-            for j in members_b:
+        for i in members(root_a):
+
+            for j in members(root_b):
+
                 decision, _, _ = compare_records(
-                    scholarships[i],
-                    scholarships[j],
+                    records[i],
+                    records[j],
                 )
 
                 if decision != "merge":
@@ -315,86 +552,108 @@ def main():
 
     actual_merges = []
 
-    for i, j, decision, score, reason in merge_pairs:
+    for candidate in merge_candidates:
+
+        i = candidate["record_a"] - 1
+        j = candidate["record_b"] - 1
+
         root_a = find(i)
         root_b = find(j)
 
         if root_a == root_b:
             continue
 
-        if not can_join_groups(root_a, root_b):
+        if not can_join(root_a, root_b):
             continue
 
         parent[root_b] = root_a
-        actual_merges.append((i, j, score, reason))
 
-    # Build final records from the validated groups.
+        actual_merges.append(candidate)
+
+    # Build final groups.
     groups = {}
 
-    for index, record in enumerate(scholarships):
+    for index, record in enumerate(records):
+
         root = find(index)
+
         groups.setdefault(root, []).append(record)
 
-    final_scholarships = []
+    final_records = [
+        merge_records(group)
+        for group in groups.values()
+    ]
 
-    for group in groups.values():
-        merged = dict(group[0])
+    # Review candidates remain separate.
+    review_items = []
 
-        for record in group[1:]:
-            merged = merge_records(merged, record)
+    for item in pair_results:
 
-        final_scholarships.append(merged)
-
-    # Print actual merges.
-    print("\nAUTOMATIC MERGES")
-
-    if not actual_merges:
-        print("No records qualified for automatic merging.")
-
-    for i, j, score, reason in actual_merges:
-        print(f"\n  Listing A: {scholarships[i].get('title')}")
-        print(f"  Listing B: {scholarships[j].get('title')}")
-        print(f"  Similarity: {score:.0%}")
-        print("  Reason:", reason)
-
-    # Show review candidates, excluding records already in
-    # the same successfully merged group.
-    print("\nPOTENTIAL DUPLICATES REQUIRING REVIEW")
-
-    review_count = 0
-
-    for i, j, decision, score, reason in pair_results:
-        if decision != "review":
+        if item["decision"] != "review":
             continue
 
-        if find(i) == find(j):
-            continue
+        i = item["record_a"] - 1
+        j = item["record_b"] - 1
 
-        review_count += 1
+        if find(i) != find(j):
+            review_items.append(item)
 
-        print(f"\n  Listing A: {scholarships[i].get('title')}")
-        print(f"  Listing B: {scholarships[j].get('title')}")
-        print(f"  Similarity: {score:.0%}")
-        print("  Reason:", reason)
-        print("  Action: Kept separate for review")
-
-    # Save only the final dataset.
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as file:
+    with OUTPUT_FILE.open("w", encoding="utf-8") as handle:
+
         json.dump(
-            final_scholarships,
-            file,
-            indent=4,
+            final_records,
+            handle,
+            indent=2,
             ensure_ascii=False,
         )
 
-    print("\nFINAL SUMMARY")
-    print("Original records:", len(scholarships))
-    print("Duplicate records merged:", len(scholarships) - len(final_scholarships))
-    print("Final records:", len(final_scholarships))
-    print("Review candidates:", review_count)
-    print("Output file:", OUTPUT_FILE)
+    with REVIEW_FILE.open("w", encoding="utf-8") as handle:
+
+        json.dump(
+
+            {
+                "input_records": len(records),
+
+                "output_records": len(final_records),
+
+                "automatic_merge_groups_reduced_by":
+                    len(records) - len(final_records),
+
+                "review_candidates": review_items,
+
+                "automatic_merges": actual_merges,
+
+                "note": (
+                    "Review candidates remain separate in the output. "
+                    "No uncertain pair is automatically merged."
+                ),
+            },
+
+            handle,
+
+            indent=2,
+
+            ensure_ascii=False,
+        )
+
+    print("\nDEDUPLICATION COMPLETE")
+
+    print("Input records:", len(records))
+
+    print("Output records:", len(final_records))
+
+    print(
+        "Records consolidated:",
+        len(records) - len(final_records),
+    )
+
+    print("Review candidates:", len(review_items))
+
+    print("Output:", OUTPUT_FILE)
+
+    print("Review report:", REVIEW_FILE)
 
 
 if __name__ == "__main__":

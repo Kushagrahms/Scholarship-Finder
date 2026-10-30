@@ -16,7 +16,7 @@ DATA_FILE = (
     / "scraper"
     / "scholarship_scraper"
     / "data"
-    / "normalized_scholarships.json"
+    / "deduplicated_scholarships.json"
 )
 
 
@@ -67,6 +67,27 @@ def clean_text(value):
         return json.dumps(value, ensure_ascii=False)
     value = str(value).strip()
     return value or None
+
+def merge_json_lists(existing, incoming):
+    """Merge JSON lists without losing existing values or adding duplicates."""
+
+    if incoming is None:
+        return existing
+
+    existing = existing if isinstance(existing, list) else []
+    incoming = incoming if isinstance(incoming, list) else []
+
+    merged = []
+    seen = set()
+
+    for item in existing + incoming:
+        key = json.dumps(item, sort_keys=True, ensure_ascii=False)
+
+        if key not in seen:
+            seen.add(key)
+            merged.append(item)
+
+    return merged
 
 
 def infer_education_level(title, eligibility=None):
@@ -161,7 +182,7 @@ def infer_location(title, provider, eligibility, existing=None):
 def import_scholarships():
     if not DATA_FILE.exists():
         raise FileNotFoundError(
-            f"Normalized data file not found: {DATA_FILE}"
+            f"Deduplicated data file not found: {DATA_FILE}"
         )
 
     with DATA_FILE.open("r", encoding="utf-8") as file:
@@ -181,19 +202,26 @@ def import_scholarships():
                 title = clean_text(record.get("title"))
                 provider = clean_text(record.get("provider"))
 
-                if not title or not provider:
+                if not title:
                     skipped += 1
                     errors.append(
-                        f"Record {index}: missing title or provider"
+                        f"Record {index}: missing title"
                     )
                     continue
 
                 source_url = clean_text(record.get("source_url"))
-
-                statement = select(Scholarship).where(
-                    Scholarship.title == title,
-                    Scholarship.source_url == source_url,
-                )
+                source = clean_text(record.get("source"))
+                if source_url:
+                    statement = select(Scholarship).where(
+                        Scholarship.title == title,
+                        Scholarship.source_url == source_url,
+                    )
+                else:
+                    statement = select(Scholarship).where(
+                        Scholarship.title == title,
+                        Scholarship.source == source,
+                        Scholarship.source_url.is_(None),
+                    )
                 scholarship = db.scalars(statement).first()
 
                 is_new = scholarship is None
@@ -232,7 +260,13 @@ def import_scholarships():
 
                 # Core fields
                 scholarship.title = title
-                scholarship.provider = provider
+                if provider is not None or is_new:
+                    scholarship.provider = provider
+
+                now = datetime.now().astimezone()
+                scholarship.last_seen = now
+                if is_new:
+                    scholarship.first_seen = now
 
                 # For optional fields, preserve an existing value if the
                 # latest source has no value. New records remain nullable.
@@ -269,6 +303,16 @@ def import_scholarships():
                 for field, value in optional_values.items():
                     if value is not None or is_new:
                         setattr(scholarship, field, value)
+
+                scholarship.sources = merge_json_lists(
+                    scholarship.sources, record.get("sources"),
+                )
+                scholarship.source_references = merge_json_lists(
+                    scholarship.source_references, record.get("source_references"),
+                )
+                scholarship.source_metadata = merge_json_lists(
+                    scholarship.source_metadata, record.get("source_metadata"),
+                )
 
                 if is_new:
                     db.add(scholarship)
